@@ -19,7 +19,7 @@ type EnrichedConversation = Doc<"conversations"> & {
 };
 
 const filters: { id: Filter; label: string }[] = [
-  { id: "all", label: "All" },
+  { id: "all", label: "Open" },
   { id: "unread", label: "Unread" },
   { id: "unassigned", label: "Unassigned" },
   { id: "assigned_to_me", label: "Assigned to me" },
@@ -64,6 +64,7 @@ export function InboxView() {
   const sendFromAgent = useMutation(api.messages.sendFromAgent);
   const markRead = useMutation(api.messages.markRead);
   const assignToMe = useMutation(api.conversations.assignToMe);
+  const takeOver = useMutation(api.conversations.takeOver);
   const unassign = useMutation(api.conversations.unassign);
   const setStatus = useMutation(api.conversations.setStatus);
   const heartbeat = useMutation(api.presence.heartbeat);
@@ -119,8 +120,7 @@ export function InboxView() {
   }
 
   async function handleTakeOver(conversationId: Id<"conversations">) {
-    await assignToMe({ conversationId });
-    await pauseAi({ conversationId });
+    await takeOver({ conversationId });
   }
 
   return (

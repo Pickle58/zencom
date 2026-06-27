@@ -133,16 +133,15 @@
     {
       "id": 9,
       "prompt": "i'm trying to use clerk billing in my production app but i can't find the billing section in the dashboard and has({ plan }) always returns false. is billing broken?",
-      "expected_output": "Explanation that Clerk Billing must be explicitly enabled in Dashboard → Billing → Settings (this is Dashboard-only, the CLI and Backend API cannot toggle it). Mention that <PricingTable /> will throw 'cannot_render_billing_disabled' in development when this step is skipped.",
+      "expected_output": "Explanation that Clerk Billing is not enabled by default and must be explicitly turned on via Dashboard → Billing → Settings or programmatically with `clerk enable billing` / PLAPI billing config (see Agent-first section in billing skill). Mention that <PricingTable /> throws 'cannot_render_billing_disabled' in development when billing is disabled, and that has({ plan }) returns false until billing is enabled regardless of Stripe configuration.",
       "scaffold": "nextjs-basic-auth",
       "files": [],
       "assertions": [
-        "States that Billing is not enabled by default and must be explicitly enabled in Dashboard → Billing → Settings",
-        "Surfaces the Dashboard link (dashboard.clerk.com) as the only way to toggle billing today",
+        "States that Billing is not enabled by default and must be explicitly enabled before PricingTable or has({ plan }) will work",
+        "Mentions enablement via Dashboard → Billing → Settings (dashboard.clerk.com) and/or `clerk enable billing` (or PLAPI billing config via `clerk config patch` / Platform API PATCH)",
         "Mentions the 'cannot_render_billing_disabled' error code or the '<PricingTable /> cannot be rendered when billing is disabled' message as the developer-facing signal",
         "Explains that has({ plan }) returns false when Billing is not enabled regardless of any Stripe configuration",
-        "Does not claim the Clerk CLI, clerk config patch, Backend API, or Platform API can enable billing",
-        "Does not diagnose this as a code bug before confirming Billing is enabled in Dashboard"
+        "Does not diagnose this as a code bug before confirming Billing is enabled"
       ]
     },
     {

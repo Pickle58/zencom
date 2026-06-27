@@ -175,7 +175,7 @@ export const autoReplyFromVisitor = internalAction({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    if (args.visitorMessageBody.startsWith("/ai")) {
+    if (args.visitorMessageBody.startsWith("/ai ")) {
       return null;
     }
 
@@ -257,6 +257,8 @@ async function generateWithLlm(
   return json.choices[0]?.message.content ?? "Sorry, I could not generate an answer.";
 }
 
+const LLM_STREAM_IDLE_TIMEOUT_MS = 60_000;
+
 async function streamWithLlm(
   ctx: ActionCtx,
   messageId: Id<"messages">,
@@ -272,75 +274,128 @@ async function streamWithLlm(
     .map((c, i) => `[${i + 1}] ${c.title}: ${c.excerpt}`)
     .join("\n");
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a helpful support assistant. Answer using the provided context. Cite sources by number when relevant.",
-        },
-        {
-          role: "user",
-          content: `Question: ${query}\n\nContext:\n${contextBlock || "No context found."}`,
-        },
-      ],
-      temperature: 0.3,
-      stream: true,
-    }),
-  });
+  const abortController = new AbortController();
+  let idleTimeoutId: ReturnType<typeof setTimeout> | undefined;
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
 
-  if (!response.ok) {
-    throw new Error(`LLM request failed: ${response.status}`);
-  }
+  const clearIdleTimeout = () => {
+    if (idleTimeoutId !== undefined) {
+      clearTimeout(idleTimeoutId);
+      idleTimeoutId = undefined;
+    }
+  };
 
-  const reader = response.body?.getReader();
-  if (!reader) {
-    throw new Error("LLM response had no body");
-  }
+  const resetIdleTimeout = () => {
+    clearIdleTimeout();
+    idleTimeoutId = setTimeout(() => {
+      void reader?.cancel().catch(() => undefined);
+      abortController.abort();
+    }, LLM_STREAM_IDLE_TIMEOUT_MS);
+  };
 
-  const decoder = new TextDecoder();
-  let fullAnswer = "";
-  let buffer = "";
+  try {
+    resetIdleTimeout();
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      signal: abortController.signal,
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a helpful support assistant. Answer using the provided context. Cite sources by number when relevant.",
+          },
+          {
+            role: "user",
+            content: `Question: ${query}\n\nContext:\n${contextBlock || "No context found."}`,
+          },
+        ],
+        temperature: 0.3,
+        stream: true,
+      }),
+    });
 
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
+    if (!response.ok) {
+      throw new Error(`LLM request failed: ${response.status}`);
+    }
 
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed.startsWith("data:")) continue;
+    reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error("LLM response had no body");
+    }
 
-      const data = trimmed.slice(5).trim();
-      if (data === "[DONE]") continue;
+    const decoder = new TextDecoder();
+    let fullAnswer = "";
+    let buffer = "";
 
+    while (true) {
+      let done: boolean;
+      let value: Uint8Array | undefined;
       try {
-        const parsed = JSON.parse(data) as {
-          choices: Array<{ delta: { content?: string } }>;
-        };
-        const delta = parsed.choices[0]?.delta?.content ?? "";
-        if (!delta) continue;
+        ({ done, value } = await reader.read());
+      } catch (error) {
+        if (abortController.signal.aborted) {
+          throw new Error("LLM stream timed out");
+        }
+        throw error;
+      }
 
-        fullAnswer += delta;
-        await ctx.runMutation(internal.aiInternals.appendAiMessageBody, {
-          messageId,
-          delta,
-        });
-      } catch {
-        // Skip malformed SSE chunks.
+      if (done) break;
+
+      resetIdleTimeout();
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("data:")) continue;
+
+        const data = trimmed.slice(5).trim();
+        if (data === "[DONE]") continue;
+
+        try {
+          const parsed = JSON.parse(data) as {
+            choices: Array<{ delta: { content?: string } }>;
+          };
+          const delta = parsed.choices[0]?.delta?.content ?? "";
+          if (!delta) continue;
+
+          fullAnswer += delta;
+          await ctx.runMutation(internal.aiInternals.appendAiMessageBody, {
+            messageId,
+            delta,
+          });
+        } catch {
+          // Skip malformed SSE chunks.
+        }
       }
     }
-  }
 
-  return fullAnswer || "Sorry, I could not generate an answer.";
+    const emptyAnswerFallback = "Sorry, I could not generate an answer.";
+    if (!fullAnswer) {
+      await ctx.runMutation(internal.aiInternals.appendAiMessageBody, {
+        messageId,
+        delta: emptyAnswerFallback,
+      });
+      return emptyAnswerFallback;
+    }
+
+    return fullAnswer;
+  } catch (error) {
+    if (abortController.signal.aborted) {
+      throw new Error("LLM stream timed out");
+    }
+    throw error;
+  } finally {
+    clearIdleTimeout();
+    void reader?.cancel().catch(() => undefined);
+  }
 }

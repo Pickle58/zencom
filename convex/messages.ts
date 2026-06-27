@@ -89,9 +89,10 @@ export const sendFromVisitor = widgetMutation({
     await ctx.db.patch("conversations", args.conversationId, {
       lastMessageAt: now,
       unreadByAgent: true,
+      lastMessageBody: trimmed,
     });
 
-    if (!trimmed.startsWith("/ai")) {
+    if (!trimmed.startsWith("/ai ")) {
       await ctx.scheduler.runAfter(0, internal.aiActions.autoReplyFromVisitor, {
         embedKey: args.embedKey,
         conversationId: args.conversationId,
@@ -135,6 +136,7 @@ export const sendFromAgent = orgMutation({
       lastMessageAt: now,
       unreadByAgent: false,
       aiPaused: true,
+      lastMessageBody: trimmed,
     });
 
     return messageId;

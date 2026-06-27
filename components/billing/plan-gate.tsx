@@ -23,9 +23,9 @@ function DefaultUpgradeFallback() {
         </p>
         <Button
           nativeButton={false}
-          render={<Link href="/dashboard/billing" />}
+          render={<Link href="/pricing" />}
         >
-          View billing
+          View plans
         </Button>
       </CardContent>
     </Card>

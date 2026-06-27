@@ -148,7 +148,7 @@ export default function LeadsPage() {
                     />
                   </TableCell>
                   <TableCell className="space-x-2">
-                    {lead.status !== "contacted" ? (
+                    {lead.status === "new" ? (
                       <Button
                         size="sm"
                         variant="outline"
