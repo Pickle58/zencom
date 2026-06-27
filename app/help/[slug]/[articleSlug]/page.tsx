@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { fetchQuery } from "convex/nextjs";
+import { MarkdownBody } from "@/components/markdown/markdown-body";
 import { api } from "@/convex/_generated/api";
 
 export default async function HelpArticlePage({
@@ -26,9 +27,9 @@ export default async function HelpArticlePage({
       <Link href={`/help/${slug}`} className="text-muted-foreground text-sm underline">
         ← Back to help center
       </Link>
-      <article className="prose dark:prose-invert max-w-none">
-        <h1>{article.title}</h1>
-        <pre className="whitespace-pre-wrap font-sans text-base">{article.bodyMarkdown}</pre>
+      <article>
+        <h1 className="mb-6 text-3xl font-semibold">{article.title}</h1>
+        <MarkdownBody content={article.bodyMarkdown} />
       </article>
     </main>
   );

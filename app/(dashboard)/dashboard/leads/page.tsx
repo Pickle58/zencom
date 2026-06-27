@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import type { Doc } from "@/convex/_generated/dataModel";
+import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -16,6 +18,30 @@ import {
 } from "@/components/ui/table";
 
 type LeadStatus = "new" | "contacted" | "closed";
+
+const COLUMN_COUNT = 8;
+
+function LeadNotesInput({
+  lead,
+  onSave,
+}: {
+  lead: Doc<"leads">;
+  onSave: (args: { leadId: Id<"leads">; status: LeadStatus; notes: string }) => void;
+}) {
+  return (
+    <Input
+      defaultValue={lead.notes ?? ""}
+      className="h-8 min-w-[8rem] text-sm"
+      placeholder="Add notes..."
+      onBlur={(e) => {
+        const notes = e.target.value;
+        if (notes !== (lead.notes ?? "")) {
+          onSave({ leadId: lead._id, status: lead.status, notes });
+        }
+      }}
+    />
+  );
+}
 
 export default function LeadsPage() {
   const [statusFilter, setStatusFilter] = useState<LeadStatus | undefined>();
@@ -48,12 +74,19 @@ export default function LeadsPage() {
       </div>
 
       <div className="flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          variant={statusFilter === undefined ? "default" : "outline"}
+          onClick={() => setStatusFilter(undefined)}
+        >
+          All
+        </Button>
         {(["new", "contacted", "closed"] as const).map((status) => (
           <Button
             key={status}
             size="sm"
             variant={statusFilter === status ? "default" : "outline"}
-            onClick={() => setStatusFilter(statusFilter === status ? undefined : status)}
+            onClick={() => setStatusFilter(status)}
           >
             {status}
           </Button>
@@ -72,46 +105,86 @@ export default function LeadsPage() {
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
+              <TableHead>Phone</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Source</TableHead>
+              <TableHead>Created</TableHead>
+              <TableHead>Notes</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {(leads ?? []).map((lead: Doc<"leads">) => (
-              <TableRow key={lead._id}>
-                <TableCell>{lead.name}</TableCell>
-                <TableCell>{lead.email ?? "—"}</TableCell>
-                <TableCell>
-                  <Badge variant="outline">{lead.status}</Badge>
-                </TableCell>
-                <TableCell>{lead.source}</TableCell>
-                <TableCell className="space-x-2">
-                  {lead.status !== "contacted" ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() =>
-                        void updateStatus({ leadId: lead._id, status: "contacted" })
-                      }
-                    >
-                      Contacted
-                    </Button>
-                  ) : null}
-                  {lead.status !== "closed" ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() =>
-                        void updateStatus({ leadId: lead._id, status: "closed" })
-                      }
-                    >
-                      Close
-                    </Button>
-                  ) : null}
+            {leads === undefined ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  {Array.from({ length: COLUMN_COUNT }).map((__, j) => (
+                    <TableCell key={j}>
+                      <Skeleton className="h-8 w-full" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : leads.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={COLUMN_COUNT} className="h-24 text-center">
+                  No leads yet
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              leads.map((lead: Doc<"leads">) => (
+                <TableRow key={lead._id}>
+                  <TableCell>{lead.name}</TableCell>
+                  <TableCell>{lead.email ?? "—"}</TableCell>
+                  <TableCell>{lead.phone ?? "—"}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{lead.status}</Badge>
+                  </TableCell>
+                  <TableCell>{lead.source}</TableCell>
+                  <TableCell>{new Date(lead.createdAt).toLocaleDateString()}</TableCell>
+                  <TableCell>
+                    <LeadNotesInput
+                      lead={lead}
+                      onSave={(args) => void updateStatus(args)}
+                    />
+                  </TableCell>
+                  <TableCell className="space-x-2">
+                    {lead.status !== "contacted" ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          void updateStatus({ leadId: lead._id, status: "contacted" })
+                        }
+                      >
+                        Contacted
+                      </Button>
+                    ) : null}
+                    {lead.status !== "closed" ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          void updateStatus({ leadId: lead._id, status: "closed" })
+                        }
+                      >
+                        Close
+                      </Button>
+                    ) : null}
+                    {lead.status === "closed" ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          void updateStatus({ leadId: lead._id, status: "new" })
+                        }
+                      >
+                        Reopen
+                      </Button>
+                    ) : null}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>

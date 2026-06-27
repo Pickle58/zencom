@@ -1,5 +1,18 @@
 import { v } from "convex/values";
-import { widgetMutation, widgetQuery } from "./lib/customFunctions";
+import { orgQuery, widgetMutation, widgetQuery } from "./lib/customFunctions";
+import { widgetSettingsValidator } from "./schema";
+
+const visitorValidator = v.object({
+  _id: v.id("visitors"),
+  _creationTime: v.number(),
+  workspaceId: v.id("workspaces"),
+  sessionToken: v.string(),
+  name: v.optional(v.string()),
+  email: v.optional(v.string()),
+  phone: v.optional(v.string()),
+  metadata: v.optional(v.record(v.string(), v.string())),
+  lastSeenAt: v.number(),
+});
 
 export const getOrCreate = widgetMutation({
   args: {
@@ -30,15 +43,20 @@ export const getOrCreate = widgetMutation({
   },
 });
 
+export const getForAgent = orgQuery({
+  args: { visitorId: v.id("visitors") },
+  returns: v.union(visitorValidator, v.null()),
+  handler: async (ctx, args) => {
+    const visitor = await ctx.db.get("visitors", args.visitorId);
+    if (!visitor || visitor.workspaceId !== ctx.workspace._id) {
+      return null;
+    }
+    return visitor;
+  },
+});
+
 export const getWidgetSettings = widgetQuery({
   args: { embedKey: v.string() },
-  returns: v.object({
-    title: v.string(),
-    primaryColor: v.string(),
-    position: v.union(v.literal("bottom-right"), v.literal("bottom-left")),
-    leadCaptureEnabled: v.optional(v.boolean()),
-    leadCaptureRequired: v.optional(v.boolean()),
-    faqShortcuts: v.optional(v.array(v.string())),
-  }),
+  returns: widgetSettingsValidator,
   handler: async (ctx) => ctx.workspace.widgetSettings,
 });

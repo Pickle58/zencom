@@ -1,6 +1,7 @@
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
 import { orgMutation, orgQuery, widgetMutation, widgetQuery } from "./lib/customFunctions";
-import { authorTypeValidator } from "./schema";
+import { authorTypeValidator, streamStatusValidator } from "./schema";
 
 const messageValidator = v.object({
   _id: v.id("messages"),
@@ -20,6 +21,7 @@ const messageValidator = v.object({
       }),
     ),
   ),
+  streamStatus: v.optional(streamStatusValidator),
 });
 
 export const listForAgent = orgQuery({
@@ -88,6 +90,14 @@ export const sendFromVisitor = widgetMutation({
       lastMessageAt: now,
       unreadByAgent: true,
     });
+
+    if (!trimmed.startsWith("/ai")) {
+      await ctx.scheduler.runAfter(0, internal.aiActions.autoReplyFromVisitor, {
+        embedKey: args.embedKey,
+        conversationId: args.conversationId,
+        visitorMessageBody: trimmed,
+      });
+    }
 
     return messageId;
   },

@@ -1,10 +1,19 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
+export const subscriptionStatusValidator = v.union(
+  v.literal("active"),
+  v.literal("canceled"),
+  v.literal("past_due"),
+  v.literal("trialing"),
+  v.literal("incomplete"),
+);
+
 export const subscriptionSnapshotValidator = v.object({
   planSlug: v.string(),
   seatCount: v.number(),
   updatedAt: v.number(),
+  status: v.optional(subscriptionStatusValidator),
 });
 
 export const widgetSettingsValidator = v.object({
@@ -18,10 +27,19 @@ export const widgetSettingsValidator = v.object({
   soundEnabled: v.optional(v.boolean()),
   proactiveEnabled: v.optional(v.boolean()),
   proactiveDelayMs: v.optional(v.number()),
+  proactiveMessage: v.optional(v.string()),
   leadCaptureEnabled: v.optional(v.boolean()),
   leadCaptureRequired: v.optional(v.boolean()),
   faqShortcuts: v.optional(v.array(v.string())),
+  aiEnabled: v.optional(v.boolean()),
+  aiAutoReply: v.optional(v.boolean()),
 });
+
+export const streamStatusValidator = v.union(
+  v.literal("streaming"),
+  v.literal("complete"),
+  v.literal("failed"),
+);
 
 export const conversationStatusValidator = v.union(
   v.literal("open"),
@@ -87,7 +105,12 @@ export default defineSchema({
   })
     .index("by_workspace_status", ["workspaceId", "status"])
     .index("by_workspace_lastMessage", ["workspaceId", "lastMessageAt"])
-    .index("by_workspace_assigned", ["workspaceId", "assignedToClerkUserId"]),
+    .index("by_workspace_assigned", ["workspaceId", "assignedToClerkUserId"])
+    .index("by_workspace_visitor_status", [
+      "workspaceId",
+      "visitorId",
+      "status",
+    ]),
 
   messages: defineTable({
     conversationId: v.id("conversations"),
@@ -105,6 +128,7 @@ export default defineSchema({
         }),
       ),
     ),
+    streamStatus: v.optional(streamStatusValidator),
   }).index("by_conversation", ["conversationId", "createdAt"]),
 
   conversationPresence: defineTable({

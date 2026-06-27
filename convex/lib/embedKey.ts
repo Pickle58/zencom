@@ -40,7 +40,10 @@ export const defaultWidgetSettings = {
   soundEnabled: true,
   proactiveEnabled: false,
   proactiveDelayMs: 5000,
+  proactiveMessage: "Hi! How can we help?",
   leadCaptureEnabled: false,
   leadCaptureRequired: false,
   faqShortcuts: [] as string[],
+  aiEnabled: true,
+  aiAutoReply: true,
 };

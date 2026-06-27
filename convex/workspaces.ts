@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation } from "./_generated/server";
-import { orgQuery } from "./lib/customFunctions";
+import { orgMutation, orgQuery } from "./lib/customFunctions";
 import { getOrgIdFromIdentity } from "./lib/auth";
 import {
   defaultWidgetSettings,
@@ -8,7 +8,10 @@ import {
   getEmbedKeyPrefix,
   hashEmbedKey,
 } from "./lib/embedKey";
-import { widgetSettingsValidator } from "./schema";
+import {
+  subscriptionSnapshotValidator,
+  widgetSettingsValidator,
+} from "./schema";
 import type { Doc } from "./_generated/dataModel";
 
 const workspaceReturnValidator = v.object({
@@ -19,6 +22,7 @@ const workspaceReturnValidator = v.object({
   slug: v.string(),
   embedKeyPrefix: v.string(),
   widgetSettings: widgetSettingsValidator,
+  subscriptionSnapshot: v.optional(subscriptionSnapshotValidator),
   createdAt: v.number(),
 });
 
@@ -76,5 +80,19 @@ export const ensureCurrent = mutation({
       workspace: toPublicWorkspace(workspace),
       embedKeyPlaintext,
     };
+  },
+});
+
+export const rotateEmbedKey = orgMutation({
+  args: {},
+  returns: v.string(),
+  handler: async (ctx) => {
+    const embedKeyPlaintext = generateEmbedKey();
+    const embedKeyHash = await hashEmbedKey(embedKeyPlaintext);
+    await ctx.db.patch("workspaces", ctx.workspace._id, {
+      embedKeyHash,
+      embedKeyPrefix: getEmbedKeyPrefix(embedKeyPlaintext),
+    });
+    return embedKeyPlaintext;
   },
 });
