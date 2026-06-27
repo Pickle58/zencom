@@ -2,6 +2,8 @@ import { httpRouter } from "convex/server";
 import { Webhook } from "svix";
 import { internal } from "./_generated/api";
 import { httpAction } from "./_generated/server";
+import type { Infer } from "convex/values";
+import { subscriptionStatusValidator } from "./schema";
 
 const http = httpRouter();
 
@@ -9,6 +11,8 @@ type ClerkWebhookEvent = {
   type: string;
   data: Record<string, unknown>;
 };
+
+type SubscriptionStatus = Infer<typeof subscriptionStatusValidator>;
 
 function getOrgIdFromEvent(event: ClerkWebhookEvent): string | null {
   const data = event.data;
@@ -34,7 +38,27 @@ function getSeatCountFromEvent(event: ClerkWebhookEvent): number {
   if (typeof seats === "number") return seats;
   const item = data.subscription_item as { seats?: number } | undefined;
   if (typeof item?.seats === "number") return item.seats;
+  const org = data.organization as { members_count?: number } | undefined;
+  if (typeof org?.members_count === "number") return org.members_count;
   return 1;
+}
+
+function getStatusFromEvent(
+  event: ClerkWebhookEvent,
+): SubscriptionStatus | undefined {
+  const status = event.data.status;
+  if (typeof status !== "string") return undefined;
+
+  switch (status) {
+    case "active":
+    case "canceled":
+    case "past_due":
+    case "trialing":
+    case "incomplete":
+      return status;
+    default:
+      return undefined;
+  }
 }
 
 http.route({
@@ -77,20 +101,35 @@ http.route({
       });
     }
 
-    const billingEvents = [
+    const subscriptionEvents = [
       "subscription.created",
       "subscription.updated",
       "subscriptionItem.updated",
+    ];
+
+    if (subscriptionEvents.includes(event.type)) {
+      const clerkOrgId = getOrgIdFromEvent(event);
+      if (clerkOrgId) {
+        const status = getStatusFromEvent(event);
+        await ctx.runMutation(internal.webhooks.clerkBilling.syncSubscription, {
+          clerkOrgId,
+          planSlug: getPlanSlugFromEvent(event),
+          seatCount: getSeatCountFromEvent(event),
+          ...(status !== undefined ? { status } : {}),
+        });
+      }
+    }
+
+    const membershipEvents = [
       "organizationMembership.created",
       "organizationMembership.deleted",
     ];
 
-    if (billingEvents.includes(event.type)) {
+    if (membershipEvents.includes(event.type)) {
       const clerkOrgId = getOrgIdFromEvent(event);
       if (clerkOrgId) {
-        await ctx.runMutation(internal.webhooks.clerkBilling.syncSubscription, {
+        await ctx.runMutation(internal.webhooks.clerkBilling.syncSeatCount, {
           clerkOrgId,
-          planSlug: getPlanSlugFromEvent(event),
           seatCount: getSeatCountFromEvent(event),
         });
       }

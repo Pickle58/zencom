@@ -6,6 +6,12 @@ export type PlanQuotas = {
   helpArticles: number | null;
 };
 
+export const PLAN_LABELS: Record<PlanSlug, string> = {
+  "org:free": "Free",
+  "org:pro": "Pro",
+  "org:scale": "Scale",
+};
+
 export const PLAN_QUOTAS: Record<PlanSlug, PlanQuotas> = {
   "org:free": {
     aiMessagesPerMonth: 100,

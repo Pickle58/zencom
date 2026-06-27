@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "@clerk/nextjs";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
@@ -10,16 +11,37 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
-type Filter = "all" | "unread" | "unassigned" | "assigned_to_me";
+type Filter = "all" | "unread" | "unassigned" | "assigned_to_me" | "closed";
+
+type EnrichedConversation = Doc<"conversations"> & {
+  visitorName: string | null;
+  lastMessageBody: string | null;
+};
 
 const filters: { id: Filter; label: string }[] = [
   { id: "all", label: "All" },
   { id: "unread", label: "Unread" },
   { id: "unassigned", label: "Unassigned" },
   { id: "assigned_to_me", label: "Assigned to me" },
+  { id: "closed", label: "Closed" },
 ];
 
+function truncate(text: string, maxLength = 80): string {
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength)}…`;
+}
+
+function formatAssignee(clerkUserId: string): string {
+  if (clerkUserId.length <= 12) return clerkUserId;
+  return `${clerkUserId.slice(0, 6)}…${clerkUserId.slice(-4)}`;
+}
+
+function visitorLabel(conversation: EnrichedConversation): string {
+  return conversation.visitorName ?? `Visitor ${conversation.visitorId.slice(-6)}`;
+}
+
 export function InboxView() {
+  const { userId } = useAuth();
   const [filter, setFilter] = useState<Filter>("all");
   const [selectedId, setSelectedId] = useState<Id<"conversations"> | null>(null);
   const [draft, setDraft] = useState("");
@@ -28,7 +50,7 @@ export function InboxView() {
 
   const activeId = useMemo(() => {
     if (!conversations?.length) return null;
-    if (selectedId && conversations.some((c: Doc<"conversations">) => c._id === selectedId)) {
+    if (selectedId && conversations.some((c: EnrichedConversation) => c._id === selectedId)) {
       return selectedId;
     }
     return conversations[0]._id;
@@ -42,6 +64,7 @@ export function InboxView() {
   const sendFromAgent = useMutation(api.messages.sendFromAgent);
   const markRead = useMutation(api.messages.markRead);
   const assignToMe = useMutation(api.conversations.assignToMe);
+  const unassign = useMutation(api.conversations.unassign);
   const setStatus = useMutation(api.conversations.setStatus);
   const heartbeat = useMutation(api.presence.heartbeat);
   const setAgentTyping = useMutation(api.presence.setAgentTyping);
@@ -56,6 +79,11 @@ export function InboxView() {
   const pauseAi = useMutation(api.aiControl.pauseAi);
   const resumeAi = useMutation(api.aiControl.resumeAi);
 
+  const anotherAgentTyping =
+    typing?.agentTyping === true &&
+    typing.agentTypingClerkUserId !== null &&
+    typing.agentTypingClerkUserId !== userId;
+
   useEffect(() => {
     if (!activeId) return;
     void heartbeat({ conversationId: activeId });
@@ -66,9 +94,16 @@ export function InboxView() {
   }, [activeId, heartbeat]);
 
   const selected = useMemo(
-    () => conversations?.find((c: Doc<"conversations">) => c._id === activeId) ?? null,
+    () => conversations?.find((c: EnrichedConversation) => c._id === activeId) ?? null,
     [conversations, activeId],
   );
+
+  const hasAgentReply = useMemo(
+    () => (messages ?? []).some((message: Doc<"messages">) => message.authorType === "agent"),
+    [messages],
+  );
+
+  const aiHandling = selected && !selected.aiPaused && !hasAgentReply;
 
   useEffect(() => {
     if (activeId) {
@@ -83,9 +118,14 @@ export function InboxView() {
     setDraft("");
   }
 
+  async function handleTakeOver(conversationId: Id<"conversations">) {
+    await assignToMe({ conversationId });
+    await pauseAi({ conversationId });
+  }
+
   return (
-    <div className="flex h-[calc(100vh-8rem)] overflow-hidden rounded-xl border">
-      <div className="flex w-80 flex-col border-r">
+    <div className="flex h-[calc(100vh-8rem)] min-h-0 overflow-hidden rounded-xl border">
+      <div className="flex min-h-0 w-80 flex-col border-r">
         <div className="flex flex-wrap gap-1 border-b p-2">
           {filters.map((f) => (
             <Button
@@ -98,9 +138,9 @@ export function InboxView() {
             </Button>
           ))}
         </div>
-        <ScrollArea className="flex-1">
+        <ScrollArea className="min-h-0 flex-1">
           <div className="divide-y">
-            {(conversations ?? []).map((conversation: Doc<"conversations">) => (
+            {(conversations ?? []).map((conversation: EnrichedConversation) => (
               <button
                 key={conversation._id}
                 type="button"
@@ -112,14 +152,29 @@ export function InboxView() {
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate text-sm font-medium">
-                    Visitor {conversation.visitorId.slice(-6)}
+                    {visitorLabel(conversation)}
                   </span>
-                  {conversation.unreadByAgent ? (
-                    <Badge variant="default">New</Badge>
-                  ) : null}
+                  <div className="flex shrink-0 items-center gap-1">
+                    {conversation.assignedToClerkUserId ? (
+                      <Badge variant="secondary">Assigned</Badge>
+                    ) : null}
+                    {conversation.unreadByAgent ? (
+                      <Badge variant="default">New</Badge>
+                    ) : null}
+                  </div>
                 </div>
+                {conversation.lastMessageBody ? (
+                  <p className="text-muted-foreground truncate text-xs">
+                    {truncate(conversation.lastMessageBody)}
+                  </p>
+                ) : null}
                 <p className="text-muted-foreground truncate text-xs">
-                  {conversation.status} · {new Date(conversation.lastMessageAt).toLocaleString()}
+                  {conversation.status}
+                  {conversation.assignedToClerkUserId
+                    ? ` · ${formatAssignee(conversation.assignedToClerkUserId)}`
+                    : ""}
+                  {" · "}
+                  {new Date(conversation.lastMessageAt).toLocaleString()}
                 </p>
               </button>
             ))}
@@ -127,14 +182,22 @@ export function InboxView() {
         </ScrollArea>
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {selected ? (
           <>
-            <div className="flex items-center gap-2 border-b p-3">
-              <span className="text-sm font-medium">Conversation</span>
+            <div className="flex shrink-0 items-center gap-2 border-b p-3">
+              <span className="text-sm font-medium">{visitorLabel(selected)}</span>
               <Badge variant="outline">{selected.status}</Badge>
+              {selected.assignedToClerkUserId ? (
+                <Badge variant="secondary">
+                  Assigned · {formatAssignee(selected.assignedToClerkUserId)}
+                </Badge>
+              ) : null}
               {selected.aiPaused ? (
                 <Badge variant="secondary">AI paused</Badge>
+              ) : null}
+              {aiHandling ? (
+                <Badge variant="outline">AI handling</Badge>
               ) : null}
               {(viewers?.length ?? 0) > 0 ? (
                 <span className="text-muted-foreground text-xs">
@@ -142,6 +205,15 @@ export function InboxView() {
                 </span>
               ) : null}
               <div className="ml-auto flex gap-2">
+                {!selected.aiPaused ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void handleTakeOver(selected._id)}
+                  >
+                    Take over
+                  </Button>
+                ) : null}
                 <Button
                   size="sm"
                   variant="outline"
@@ -153,9 +225,23 @@ export function InboxView() {
                 >
                   {selected.aiPaused ? "Resume AI" : "Pause AI"}
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => assignToMe({ conversationId: selected._id })}>
-                  Assign to me
-                </Button>
+                {selected.assignedToClerkUserId ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void unassign({ conversationId: selected._id })}
+                  >
+                    Unassign
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => assignToMe({ conversationId: selected._id })}
+                  >
+                    Assign to me
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="outline"
@@ -170,10 +256,13 @@ export function InboxView() {
                 </Button>
               </div>
             </div>
-            <ScrollArea className="flex-1 p-4">
+            <ScrollArea className="min-h-0 flex-1 p-4">
               <div className="space-y-3">
                 {typing?.visitorTyping ? (
                   <p className="text-muted-foreground text-xs">Visitor is typing...</p>
+                ) : null}
+                {anotherAgentTyping ? (
+                  <p className="text-muted-foreground text-xs">Another agent is typing...</p>
                 ) : null}
                 {(messages ?? []).map((message: Doc<"messages">) => (
                   <div
@@ -190,7 +279,7 @@ export function InboxView() {
                 ))}
               </div>
             </ScrollArea>
-            <div className="flex gap-2 border-t p-3">
+            <div className="flex shrink-0 gap-2 border-t p-3">
               <Textarea
                 value={draft}
                 onChange={(e) => {

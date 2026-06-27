@@ -7,6 +7,12 @@
       "skillPath": "skills/core/clerk-backend-api/SKILL.md",
       "computedHash": "cbcad1341a7d32fed789abe864c829f27a2858dc8ba68b92254e9beb53467148"
     },
+    "clerk-billing": {
+      "source": "clerk/skills",
+      "sourceType": "github",
+      "skillPath": "skills/features/clerk-billing/SKILL.md",
+      "computedHash": "536615db318a51a69efa04bcb8350b7ae8c0ba471c0a78d94383e129fd0a089e"
+    },
     "clerk-cli": {
       "source": "C:\\Users\\jpilk\\AppData\\Local\\Temp\\clerk-cli-skill-7ZR8zD",
       "sourceType": "local",

@@ -21,6 +21,7 @@ import type * as kbArticles from "../kbArticles.js";
 import type * as kbDocumentActions from "../kbDocumentActions.js";
 import type * as kbDocumentInternals from "../kbDocumentInternals.js";
 import type * as kbDocuments from "../kbDocuments.js";
+import type * as kbDocumentsActions from "../kbDocumentsActions.js";
 import type * as leads from "../leads.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_customFunctions from "../lib/customFunctions.js";
@@ -57,6 +58,7 @@ declare const fullApi: ApiFromModules<{
   kbDocumentActions: typeof kbDocumentActions;
   kbDocumentInternals: typeof kbDocumentInternals;
   kbDocuments: typeof kbDocuments;
+  kbDocumentsActions: typeof kbDocumentsActions;
   leads: typeof leads;
   "lib/auth": typeof lib_auth;
   "lib/customFunctions": typeof lib_customFunctions;

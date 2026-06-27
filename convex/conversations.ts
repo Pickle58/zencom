@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { orgMutation, orgQuery, widgetMutation } from "./lib/customFunctions";
+import { orgMutation, orgQuery, widgetMutation, widgetQuery } from "./lib/customFunctions";
 import { conversationStatusValidator } from "./schema";
 
 const conversationValidator = v.object({
@@ -17,18 +17,25 @@ const conversationValidator = v.object({
   agentTypingClerkUserId: v.optional(v.string()),
 });
 
+const enrichedConversationValidator = v.object({
+  ...conversationValidator.fields,
+  visitorName: v.union(v.string(), v.null()),
+  lastMessageBody: v.union(v.string(), v.null()),
+});
+
 export const list = orgQuery({
   args: {
     filter: v.optional(
       v.union(
         v.literal("all"),
+        v.literal("closed"),
         v.literal("unread"),
         v.literal("unassigned"),
         v.literal("assigned_to_me"),
       ),
     ),
   },
-  returns: v.array(conversationValidator),
+  returns: v.array(enrichedConversationValidator),
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     const clerkUserId = identity?.subject;
@@ -40,7 +47,11 @@ export const list = orgQuery({
       .collect();
 
     const filter = args.filter ?? "all";
-    if (filter === "unread") {
+    if (filter === "all") {
+      conversations = conversations.filter((c) => c.status === "open");
+    } else if (filter === "closed") {
+      conversations = conversations.filter((c) => c.status === "closed");
+    } else if (filter === "unread") {
       conversations = conversations.filter((c) => c.unreadByAgent);
     } else if (filter === "unassigned") {
       conversations = conversations.filter((c) => !c.assignedToClerkUserId);
@@ -50,7 +61,24 @@ export const list = orgQuery({
       );
     }
 
-    return conversations;
+    return await Promise.all(
+      conversations.map(async (conversation) => {
+        const visitor = await ctx.db.get("visitors", conversation.visitorId);
+        const latestMessage = await ctx.db
+          .query("messages")
+          .withIndex("by_conversation", (q) =>
+            q.eq("conversationId", conversation._id),
+          )
+          .order("desc")
+          .first();
+
+        return {
+          ...conversation,
+          visitorName: visitor?.name ?? visitor?.email ?? null,
+          lastMessageBody: latestMessage?.body ?? null,
+        };
+      }),
+    );
   },
 });
 
@@ -66,14 +94,16 @@ export const getOrCreateForVisitor = widgetMutation({
       throw new Error("Unauthorized");
     }
 
-    const open = await ctx.db
+    const existing = await ctx.db
       .query("conversations")
-      .withIndex("by_workspace_status", (q) =>
-        q.eq("workspaceId", ctx.workspace._id).eq("status", "open"),
+      .withIndex("by_workspace_visitor_status", (q) =>
+        q
+          .eq("workspaceId", ctx.workspace._id)
+          .eq("visitorId", args.visitorId)
+          .eq("status", "open"),
       )
-      .collect();
+      .unique();
 
-    const existing = open.find((c) => c.visitorId === args.visitorId);
     if (existing) return { conversationId: existing._id };
 
     const conversationId = await ctx.db.insert("conversations", {
@@ -85,6 +115,35 @@ export const getOrCreateForVisitor = widgetMutation({
     });
 
     return { conversationId };
+  },
+});
+
+export const getForWidget = widgetQuery({
+  args: {
+    embedKey: v.string(),
+    conversationId: v.id("conversations"),
+  },
+  returns: v.object({
+    aiPaused: v.boolean(),
+    aiEnabled: v.boolean(),
+    hasAgentReply: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    const conversation = await ctx.db.get("conversations", args.conversationId);
+    if (!conversation || conversation.workspaceId !== ctx.workspace._id) {
+      throw new Error("Unauthorized");
+    }
+
+    const messages = await ctx.db
+      .query("messages")
+      .withIndex("by_conversation", (q) => q.eq("conversationId", args.conversationId))
+      .collect();
+
+    return {
+      aiPaused: conversation.aiPaused ?? false,
+      aiEnabled: ctx.workspace.widgetSettings.aiEnabled ?? true,
+      hasAgentReply: messages.some((message) => message.authorType === "agent"),
+    };
   },
 });
 
@@ -102,6 +161,22 @@ export const assignToMe = orgMutation({
 
     await ctx.db.patch("conversations", args.conversationId, {
       assignedToClerkUserId: identity.subject,
+    });
+    return null;
+  },
+});
+
+export const unassign = orgMutation({
+  args: { conversationId: v.id("conversations") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const conversation = await ctx.db.get("conversations", args.conversationId);
+    if (!conversation || conversation.workspaceId !== ctx.workspace._id) {
+      throw new Error("Unauthorized");
+    }
+
+    await ctx.db.patch("conversations", args.conversationId, {
+      assignedToClerkUserId: undefined,
     });
     return null;
   },

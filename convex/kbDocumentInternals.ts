@@ -1,5 +1,20 @@
 import { v } from "convex/values";
-import { internalMutation } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import { internalMutation, type MutationCtx } from "./_generated/server";
+
+export async function deleteChunksForDocumentHelper(
+  ctx: MutationCtx,
+  documentId: Id<"kbDocuments">,
+): Promise<void> {
+  const chunks = await ctx.db
+    .query("kbChunks")
+    .withIndex("by_document", (q) => q.eq("documentId", documentId))
+    .collect();
+
+  for (const chunk of chunks) {
+    await ctx.db.delete("kbChunks", chunk._id);
+  }
+}
 
 export const storeChunks = internalMutation({
   args: {
@@ -32,6 +47,15 @@ export const storeChunks = internalMutation({
       chunkCount: args.chunks.length,
     });
 
+    return null;
+  },
+});
+
+export const deleteChunksForDocument = internalMutation({
+  args: { documentId: v.id("kbDocuments") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await deleteChunksForDocumentHelper(ctx, args.documentId);
     return null;
   },
 });

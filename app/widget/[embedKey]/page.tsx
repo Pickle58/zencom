@@ -8,7 +8,7 @@ export default async function WidgetPage({
   const { embedKey } = await params;
 
   return (
-    <div className="h-dvh w-full">
+    <div className="flex h-dvh min-h-0 w-full flex-col">
       <WidgetChat embedKey={decodeURIComponent(embedKey)} />
     </div>
   );

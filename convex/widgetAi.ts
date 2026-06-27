@@ -28,11 +28,11 @@ export const askFromWidget = action({
       excerpt: string;
     }>;
   }> => {
-    return await ctx.runAction(internal.aiActions.generateAnswer, {
+    return await ctx.runAction(internal.aiActions.streamGenerateAnswer, {
       query: args.query,
-      orgId: args.embedKey,
       conversationId: args.conversationId,
       embedKey: args.embedKey,
+      orgId: "",
     });
   },
 });

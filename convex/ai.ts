@@ -3,6 +3,7 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { action } from "./_generated/server";
+import { getOrgIdFromIdentity } from "./lib/auth";
 
 export const askFromDashboard = action({
   args: { query: v.string() },
@@ -27,10 +28,7 @@ export const askFromDashboard = action({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
 
-    const orgId =
-      (identity as { org_id?: string; orgId?: string }).org_id ??
-      (identity as { org_id?: string; orgId?: string }).orgId ??
-      identity.subject;
+    const orgId = getOrgIdFromIdentity(identity);
 
     return await ctx.runAction(internal.aiActions.generateAnswer, {
       query: args.query,
