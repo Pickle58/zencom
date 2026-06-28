@@ -15,6 +15,7 @@ const conversationValidator = v.object({
   visitorTypingAt: v.optional(v.number()),
   agentTypingAt: v.optional(v.number()),
   agentTypingClerkUserId: v.optional(v.string()),
+  lastMessageBody: v.optional(v.string()),
 });
 
 const enrichedConversationValidator = v.object({
@@ -61,24 +62,21 @@ export const list = orgQuery({
       );
     }
 
-    return await Promise.all(
-      conversations.map(async (conversation) => {
-        const visitor = await ctx.db.get("visitors", conversation.visitorId);
-        const latestMessage = await ctx.db
-          .query("messages")
-          .withIndex("by_conversation", (q) =>
-            q.eq("conversationId", conversation._id),
-          )
-          .order("desc")
-          .first();
-
-        return {
-          ...conversation,
-          visitorName: visitor?.name ?? visitor?.email ?? null,
-          lastMessageBody: latestMessage?.body ?? null,
-        };
-      }),
+    const visitorIds = [...new Set(conversations.map((conversation) => conversation.visitorId))];
+    const visitors = await Promise.all(
+      visitorIds.map((visitorId) => ctx.db.get("visitors", visitorId)),
     );
+    const visitorNameById = new Map(
+      visitors
+        .filter((visitor): visitor is NonNullable<typeof visitor> => visitor !== null)
+        .map((visitor) => [visitor._id, visitor.name ?? visitor.email ?? null] as const),
+    );
+
+    return conversations.map((conversation) => ({
+      ...conversation,
+      visitorName: visitorNameById.get(conversation.visitorId) ?? null,
+      lastMessageBody: conversation.lastMessageBody ?? null,
+    }));
   },
 });
 
@@ -94,7 +92,7 @@ export const getOrCreateForVisitor = widgetMutation({
       throw new Error("Unauthorized");
     }
 
-    const existing = await ctx.db
+    const openConversations = await ctx.db
       .query("conversations")
       .withIndex("by_workspace_visitor_status", (q) =>
         q
@@ -102,9 +100,14 @@ export const getOrCreateForVisitor = widgetMutation({
           .eq("visitorId", args.visitorId)
           .eq("status", "open"),
       )
-      .unique();
+      .collect();
 
-    if (existing) return { conversationId: existing._id };
+    if (openConversations.length > 0) {
+      const existing = openConversations.reduce((latest, conversation) =>
+        conversation.lastMessageAt > latest.lastMessageAt ? conversation : latest,
+      );
+      return { conversationId: existing._id };
+    }
 
     const conversationId = await ctx.db.insert("conversations", {
       workspaceId: ctx.workspace._id,
@@ -161,6 +164,26 @@ export const assignToMe = orgMutation({
 
     await ctx.db.patch("conversations", args.conversationId, {
       assignedToClerkUserId: identity.subject,
+    });
+    return null;
+  },
+});
+
+export const takeOver = orgMutation({
+  args: { conversationId: v.id("conversations") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const conversation = await ctx.db.get("conversations", args.conversationId);
+    if (!conversation || conversation.workspaceId !== ctx.workspace._id) {
+      throw new Error("Unauthorized");
+    }
+
+    await ctx.db.patch("conversations", args.conversationId, {
+      assignedToClerkUserId: identity.subject,
+      aiPaused: true,
     });
     return null;
   },

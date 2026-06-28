@@ -216,7 +216,7 @@ export default function CustomizePage() {
           </p>
           <div
             className="mx-4 mb-4 h-[480px] overflow-hidden border"
-            style={{ borderRadius: draft.borderRadius ?? 0 }}
+            style={{ borderRadius: draft.borderRadius ?? 12 }}
           >
             <div
               className="px-4 py-3 text-sm font-medium text-white"

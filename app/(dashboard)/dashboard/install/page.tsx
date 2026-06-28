@@ -8,13 +8,14 @@ import { EmbedKeyPanel } from "@/components/dashboard/embed-key-panel";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /** Reference snippet — proactive attrs are added automatically when enabled in Customize. */
-const EMBED_SNIPPET_OPTIONAL = `<!-- Optional proactive attrs (add to script tag when enabled in Customize):
+function buildEmbedSnippetOptional(origin: string) {
+  return `<!-- Optional proactive attrs (add to script tag when enabled in Customize):
   data-proactive-enabled="true"
   data-proactive-delay="5000"
   data-proactive-message="Hi! How can we help?"
 -->
 <script
-  src="/embed.js"
+  src="${origin}/embed.js"
   data-key="YOUR_EMBED_KEY"
   data-title="Chat with us"
   data-color="#2563eb"
@@ -22,9 +23,11 @@ const EMBED_SNIPPET_OPTIONAL = `<!-- Optional proactive attrs (add to script tag
   data-border-radius="12"
   async
 ></script>`;
+}
 
 function InstallContent() {
   const workspace = useQuery(api.workspaces.getCurrent, {});
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
 
   if (workspace === undefined) return <Skeleton className="h-32 w-full max-w-xl" />;
 
@@ -61,7 +64,7 @@ function InstallContent() {
       <details className="text-sm">
         <summary className="cursor-pointer text-muted-foreground">Optional embed attributes</summary>
         <pre className="mt-2 overflow-x-auto rounded-lg border bg-muted/40 p-4 text-xs">
-          {EMBED_SNIPPET_OPTIONAL}
+          {buildEmbedSnippetOptional(origin)}
         </pre>
         <p className="text-muted-foreground mt-2 text-xs">
           Proactive attributes are included in your copied snippet when enabled in Customize.

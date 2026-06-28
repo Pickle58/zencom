@@ -18,7 +18,8 @@ function progressPercent(used: number, limit: number | null): number {
 }
 
 export function UsageMeter({ label, used, limit, className }: UsageMeterProps) {
-  const percent = progressPercent(used, limit);
+  const isUnlimited = limit === null;
+  const percent = isUnlimited ? 0 : progressPercent(used, limit);
 
   return (
     <div className={cn("space-y-2", className)}>
@@ -28,12 +29,16 @@ export function UsageMeter({ label, used, limit, className }: UsageMeterProps) {
           {used.toLocaleString()} / {formatLimit(limit)}
         </span>
       </div>
-      <div className="bg-muted h-2 overflow-hidden rounded-full">
-        <div
-          className="bg-primary h-full rounded-full transition-all"
-          style={{ width: `${percent}%` }}
-        />
-      </div>
+      {isUnlimited ? (
+        <p className="text-muted-foreground text-xs">Unlimited on this plan</p>
+      ) : (
+        <div className="bg-muted h-2 overflow-hidden rounded-full">
+          <div
+            className="bg-primary h-full rounded-full transition-all"
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+      )}
     </div>
   );
 }

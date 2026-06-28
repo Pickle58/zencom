@@ -175,6 +175,7 @@ export const saveAiMessage = internalMutation({
     await ctx.db.patch("conversations", args.conversationId, {
       lastMessageAt: now,
       unreadByAgent: true,
+      lastMessageBody: args.body,
     });
     return null;
   },
@@ -241,8 +242,13 @@ export const createStreamingAiMessage = internalMutation({
   },
   returns: v.id("messages"),
   handler: async (ctx, args) => {
+    const conversation = await ctx.db.get("conversations", args.conversationId);
+    if (!conversation || conversation.workspaceId !== args.workspaceId) {
+      throw new Error("Unauthorized");
+    }
+
     const now = Date.now();
-    return await ctx.db.insert("messages", {
+    const messageId = await ctx.db.insert("messages", {
       conversationId: args.conversationId,
       workspaceId: args.workspaceId,
       authorType: "ai",
@@ -250,6 +256,11 @@ export const createStreamingAiMessage = internalMutation({
       createdAt: now,
       streamStatus: "streaming",
     });
+    await ctx.db.patch("conversations", args.conversationId, {
+      lastMessageAt: now,
+      lastMessageBody: "",
+    });
+    return messageId;
   },
 });
 
@@ -262,8 +273,10 @@ export const appendAiMessageBody = internalMutation({
   handler: async (ctx, args) => {
     const message = await ctx.db.get("messages", args.messageId);
     if (!message) throw new Error("Message not found");
-    await ctx.db.patch("messages", args.messageId, {
-      body: message.body + args.delta,
+    const body = message.body + args.delta;
+    await ctx.db.patch("messages", args.messageId, { body });
+    await ctx.db.patch("conversations", message.conversationId, {
+      lastMessageBody: body,
     });
     return null;
   },
@@ -303,6 +316,9 @@ export const failAiMessage = internalMutation({
     await ctx.db.patch("messages", args.messageId, {
       body: args.errorBody,
       streamStatus: "failed",
+    });
+    await ctx.db.patch("conversations", message.conversationId, {
+      lastMessageBody: args.errorBody,
     });
     return null;
   },

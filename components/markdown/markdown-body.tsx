@@ -1,4 +1,5 @@
 import ReactMarkdown from "react-markdown";
+import { cn } from "@/lib/utils";
 
 type MarkdownBodyProps = {
   content: string;
@@ -7,11 +8,11 @@ type MarkdownBodyProps = {
 
 export function MarkdownBody({ content, className }: MarkdownBodyProps) {
   return (
-    <div className={className ?? "prose dark:prose-invert max-w-none"}>
+    <div className={cn("prose dark:prose-invert max-w-none", className)}>
       <ReactMarkdown
         components={{
-          a: ({ href, children }) => (
-            <a href={href} target="_blank" rel="noopener noreferrer">
+          a: ({ node, children, ...props }) => (
+            <a {...props} target="_blank" rel="noopener noreferrer">
               {children}
             </a>
           ),

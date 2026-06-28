@@ -17,6 +17,8 @@ type SubscriptionStatus = Infer<typeof subscriptionStatusValidator>;
 function getOrgIdFromEvent(event: ClerkWebhookEvent): string | null {
   const data = event.data;
   if (typeof data.organization_id === "string") return data.organization_id;
+  const payer = data.payer as { organization_id?: string } | undefined;
+  if (typeof payer?.organization_id === "string") return payer.organization_id;
   if (typeof data.id === "string" && event.type.startsWith("organization.")) {
     return data.id;
   }
@@ -47,15 +49,28 @@ function getStatusFromEvent(
   event: ClerkWebhookEvent,
 ): SubscriptionStatus | undefined {
   const status = event.data.status;
-  if (typeof status !== "string") return undefined;
+  if (typeof status === "string") {
+    switch (status) {
+      case "active":
+      case "canceled":
+      case "past_due":
+      case "trialing":
+      case "incomplete":
+        return status;
+      default:
+        break;
+    }
+  }
 
-  switch (status) {
-    case "active":
-    case "canceled":
-    case "past_due":
-    case "trialing":
-    case "incomplete":
-      return status;
+  switch (event.type) {
+    case "subscription.active":
+    case "subscriptionItem.active":
+      return "active";
+    case "subscription.pastDue":
+    case "subscriptionItem.pastDue":
+      return "past_due";
+    case "subscriptionItem.canceled":
+      return "canceled";
     default:
       return undefined;
   }
@@ -104,7 +119,12 @@ http.route({
     const subscriptionEvents = [
       "subscription.created",
       "subscription.updated",
+      "subscription.active",
+      "subscription.pastDue",
       "subscriptionItem.updated",
+      "subscriptionItem.active",
+      "subscriptionItem.canceled",
+      "subscriptionItem.pastDue",
     ];
 
     if (subscriptionEvents.includes(event.type)) {

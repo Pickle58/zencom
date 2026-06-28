@@ -25,20 +25,22 @@ function buildSnippet(
   widget: Doc<"workspaces">["widgetSettings"] | undefined,
 ) {
   const attrs = [
-    `src="${origin}/embed.js"`,
-    `data-key="${embedKey}"`,
+    `src="${escapeHtmlAttr(`${origin}/embed.js`)}"`,
+    `data-key="${escapeHtmlAttr(embedKey)}"`,
     `data-title="${escapeHtmlAttr(widget?.title ?? "Chat")}"`,
-    `data-color="${widget?.primaryColor ?? "#2563eb"}"`,
-    `data-position="${widget?.position ?? "bottom-right"}"`,
+    `data-color="${escapeHtmlAttr(widget?.primaryColor ?? "#2563eb")}"`,
+    `data-position="${escapeHtmlAttr(widget?.position ?? "bottom-right")}"`,
   ];
 
   if (widget?.borderRadius != null) {
-    attrs.push(`data-border-radius="${widget.borderRadius}"`);
+    attrs.push(`data-border-radius="${escapeHtmlAttr(String(widget.borderRadius))}"`);
   }
 
   if (widget?.proactiveEnabled) {
     attrs.push(`data-proactive-enabled="true"`);
-    attrs.push(`data-proactive-delay="${widget.proactiveDelayMs ?? 5000}"`);
+    attrs.push(
+      `data-proactive-delay="${escapeHtmlAttr(String(widget.proactiveDelayMs ?? 5000))}"`,
+    );
     attrs.push(
       `data-proactive-message="${escapeHtmlAttr(widget.proactiveMessage ?? "Hi! How can we help?")}"`,
     );
@@ -59,7 +61,10 @@ export function EmbedKeyPanel({ workspace, showSnippet = true }: EmbedKeyPanelPr
   const { orgId } = useAuth();
   const ensureCurrent = useMutation(api.workspaces.ensureCurrent);
   const rotateEmbedKey = useMutation(api.workspaces.rotateEmbedKey);
-  const [embedKeyOverride, setEmbedKeyOverride] = useState<string | null>(null);
+  const [embedKeyOverride, setEmbedKeyOverride] = useState<{
+    orgId: string;
+    key: string;
+  } | null>(null);
   const [copied, setCopied] = useState<"key" | "snippet" | null>(null);
   const [rotating, setRotating] = useState(false);
 
@@ -67,19 +72,21 @@ export function EmbedKeyPanel({ workspace, showSnippet = true }: EmbedKeyPanelPr
     orgId && typeof window !== "undefined"
       ? sessionStorage.getItem(embedKeyStorageKey(orgId))
       : null;
-  const embedKey = embedKeyOverride ?? storedEmbedKey;
+  const scopedOverride =
+    orgId && embedKeyOverride?.orgId === orgId ? embedKeyOverride.key : null;
+  const embedKey = scopedOverride ?? storedEmbedKey;
 
   const persistKey = useCallback(
     (key: string) => {
-      setEmbedKeyOverride(key);
-      if (orgId) {
-        sessionStorage.setItem(embedKeyStorageKey(orgId), key);
-      }
+      if (!orgId) return;
+      setEmbedKeyOverride({ orgId, key });
+      sessionStorage.setItem(embedKeyStorageKey(orgId), key);
     },
     [orgId],
   );
 
   useEffect(() => {
+    setEmbedKeyOverride(null);
     if (!orgId) return;
 
     void ensureCurrent({}).then((result) => {

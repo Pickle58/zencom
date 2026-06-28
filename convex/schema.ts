@@ -102,6 +102,7 @@ export default defineSchema({
     visitorTypingAt: v.optional(v.number()),
     agentTypingAt: v.optional(v.number()),
     agentTypingClerkUserId: v.optional(v.string()),
+    lastMessageBody: v.optional(v.string()),
   })
     .index("by_workspace_status", ["workspaceId", "status"])
     .index("by_workspace_lastMessage", ["workspaceId", "lastMessageAt"])
@@ -180,6 +181,7 @@ export default defineSchema({
     embedding: v.array(v.float64()),
   })
     .index("by_document", ["documentId", "chunkIndex"])
+    .index("by_workspace", ["workspaceId"])
     .vectorIndex("by_embedding", {
       vectorField: "embedding",
       dimensions: 1536,

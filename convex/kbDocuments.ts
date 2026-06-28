@@ -88,31 +88,35 @@ export const searchText = orgQuery({
       .withIndex("by_workspace", (q) => q.eq("workspaceId", ctx.workspace._id))
       .collect();
 
+    const readyDocuments = new Map(
+      documents
+        .filter((doc) => doc.status === "ready")
+        .map((doc) => [doc._id, doc] as const),
+    );
+
+    const chunks = await ctx.db
+      .query("kbChunks")
+      .withIndex("by_workspace", (q) => q.eq("workspaceId", ctx.workspace._id))
+      .collect();
+
     const results = [];
     const seenDocumentIds = new Set<string>();
 
-    for (const doc of documents) {
+    for (const chunk of chunks) {
       if (results.length >= limit) break;
-      if (doc.status !== "ready") continue;
+      if (!chunk.text.toLowerCase().includes(queryText)) continue;
+      if (seenDocumentIds.has(chunk.documentId)) continue;
 
-      const chunks = await ctx.db
-        .query("kbChunks")
-        .withIndex("by_document", (q) => q.eq("documentId", doc._id))
-        .collect();
+      const doc = readyDocuments.get(chunk.documentId);
+      if (!doc) continue;
 
-      for (const chunk of chunks) {
-        if (!chunk.text.toLowerCase().includes(queryText)) continue;
-        if (seenDocumentIds.has(doc._id)) break;
-
-        seenDocumentIds.add(doc._id);
-        results.push({
-          documentId: doc._id,
-          title: doc.title,
-          excerpt: chunk.text.slice(0, 200),
-          score: 1,
-        });
-        break;
-      }
+      seenDocumentIds.add(chunk.documentId);
+      results.push({
+        documentId: doc._id,
+        title: doc.title,
+        excerpt: chunk.text.slice(0, 200),
+        score: 1,
+      });
     }
 
     return results;
