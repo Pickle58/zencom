@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
+import { MessageBody } from "@/components/markdown/message-body";
 import { cn } from "@/lib/utils";
 
 type Filter = "all" | "unread" | "unassigned" | "assigned_to_me" | "closed";
@@ -266,19 +267,25 @@ export function InboxView() {
                 {anotherAgentTyping ? (
                   <p className="text-muted-foreground text-xs">Another agent is typing...</p>
                 ) : null}
-                {(messages ?? []).map((message: Doc<"messages">) => (
-                  <div
-                    key={message._id}
-                    className={cn(
-                      "max-w-[80%] rounded-lg px-3 py-2 text-sm",
-                      message.authorType === "agent"
-                        ? "ml-auto bg-primary text-primary-foreground"
-                        : "bg-muted",
-                    )}
-                  >
-                    {message.body}
-                  </div>
-                ))}
+                {(messages ?? []).map((message: Doc<"messages">) => {
+                  const isAgent = message.authorType === "agent";
+                  return (
+                    <div
+                      key={message._id}
+                      className={cn(
+                        "max-w-[80%] rounded-lg px-3 py-2 text-sm",
+                        isAgent
+                          ? "ml-auto bg-primary text-primary-foreground"
+                          : "bg-muted",
+                      )}
+                    >
+                      <MessageBody
+                        content={message.body}
+                        tone={isAgent ? "inverted" : "default"}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </ScrollArea>
             <div className="flex shrink-0 gap-2 border-t p-3">

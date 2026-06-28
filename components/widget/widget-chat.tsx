@@ -7,6 +7,7 @@ import type { Doc } from "@/convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { MessageBody } from "@/components/markdown/message-body";
 import { cn } from "@/lib/utils";
 import { BRAND_WIDGET_COLOR } from "@/lib/brand";
 
@@ -315,12 +316,13 @@ export function WidgetChat({ embedKey }: { embedKey: string }) {
                   : undefined
               }
             >
-              <span className="whitespace-pre-wrap">
-                {message.body}
-                {message.authorType === "ai" && message.streamStatus === "streaming" ? (
-                  <StreamingCursor />
-                ) : null}
-              </span>
+              <MessageBody
+                content={message.body}
+                tone={message.authorType === "visitor" ? "inverted" : "default"}
+              />
+              {message.authorType === "ai" && message.streamStatus === "streaming" ? (
+                <StreamingCursor />
+              ) : null}
               {message.citations && message.citations.length > 0 ? (
                 <ol className="text-muted-foreground mt-2 list-decimal space-y-1 border-t pt-2 pl-4 text-xs">
                   {message.citations.map(

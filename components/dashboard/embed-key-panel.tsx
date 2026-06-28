@@ -12,6 +12,10 @@ function embedKeyStorageKey(clerkOrgId: string) {
   return `zencom_embed_key:${clerkOrgId}`;
 }
 
+function embedKeyMatchesPrefix(embedKey: string, embedKeyPrefix: string | undefined) {
+  return Boolean(embedKeyPrefix && embedKey.slice(0, 12) === embedKeyPrefix);
+}
+
 function escapeHtmlAttr(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -75,7 +79,12 @@ export function EmbedKeyPanel({ workspace, showSnippet = true }: EmbedKeyPanelPr
       : null;
   const scopedOverride =
     orgId && embedKeyOverride?.orgId === orgId ? embedKeyOverride.key : null;
-  const embedKey = scopedOverride ?? storedEmbedKey;
+  const candidateEmbedKey = scopedOverride ?? storedEmbedKey;
+  const embedKey =
+    candidateEmbedKey &&
+    embedKeyMatchesPrefix(candidateEmbedKey, workspace?.embedKeyPrefix)
+      ? candidateEmbedKey
+      : null;
 
   const persistKey = useCallback(
     (key: string) => {
@@ -96,6 +105,17 @@ export function EmbedKeyPanel({ workspace, showSnippet = true }: EmbedKeyPanelPr
       }
     });
   }, [orgId, ensureCurrent, persistKey]);
+
+  useEffect(() => {
+    if (!orgId || !workspace?.embedKeyPrefix || typeof window === "undefined") return;
+
+    const storageKey = embedKeyStorageKey(orgId);
+    const stored = sessionStorage.getItem(storageKey);
+    if (stored && !embedKeyMatchesPrefix(stored, workspace.embedKeyPrefix)) {
+      sessionStorage.removeItem(storageKey);
+      setEmbedKeyOverride(null);
+    }
+  }, [orgId, workspace?.embedKeyPrefix]);
 
   async function handleRotate() {
     setRotating(true);
@@ -153,8 +173,10 @@ export function EmbedKeyPanel({ workspace, showSnippet = true }: EmbedKeyPanelPr
         <div className="rounded-lg border bg-muted/40 p-4 text-sm">
           <p className="mb-2 font-medium">Embed key not available</p>
           <p className="text-muted-foreground mb-3 text-xs">
-            Your workspace was provisioned automatically. Generate a new embed key to install the
-            widget. Prefix on file:{" "}
+            {candidateEmbedKey
+              ? "Your saved embed key is outdated (for example after generating a new key). Generate a fresh key and update any sites still using the old snippet."
+              : "Your workspace was provisioned automatically. Generate an embed key to install the widget."}{" "}
+            Active prefix:{" "}
             <span className="font-mono text-foreground">{workspace?.embedKeyPrefix ?? "—"}</span>
           </p>
           <Button type="button" size="sm" disabled={rotating} onClick={() => void handleRotate()}>
