@@ -31,7 +31,8 @@ export async function verifyEmbedKey(
 }
 
 export const defaultWidgetSettings = {
-  primaryColor: "#2563eb",
+  // Keep in sync with lib/brand.ts BRAND_WIDGET_COLOR
+  primaryColor: "#5B63EB",
   position: "bottom-right" as const,
   title: "Chat with us",
   borderRadius: 12,

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
+import { BRAND_WIDGET_COLOR } from "@/lib/brand";
 
 function embedKeyStorageKey(clerkOrgId: string) {
   return `zencom_embed_key:${clerkOrgId}`;
@@ -28,7 +29,7 @@ function buildSnippet(
     `src="${escapeHtmlAttr(`${origin}/embed.js`)}"`,
     `data-key="${escapeHtmlAttr(embedKey)}"`,
     `data-title="${escapeHtmlAttr(widget?.title ?? "Chat")}"`,
-    `data-color="${escapeHtmlAttr(widget?.primaryColor ?? "#2563eb")}"`,
+    `data-color="${escapeHtmlAttr(widget?.primaryColor ?? BRAND_WIDGET_COLOR)}"`,
     `data-position="${escapeHtmlAttr(widget?.position ?? "bottom-right")}"`,
   ];
 

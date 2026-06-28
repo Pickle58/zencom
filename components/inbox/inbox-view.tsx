@@ -197,7 +197,9 @@ export function InboxView() {
                 <Badge variant="secondary">AI paused</Badge>
               ) : null}
               {aiHandling ? (
-                <Badge variant="outline">AI handling</Badge>
+                <Badge className="bg-accent text-accent-foreground hover:bg-accent/90">
+                  AI handling
+                </Badge>
               ) : null}
               {(viewers?.length ?? 0) > 0 ? (
                 <span className="text-muted-foreground text-xs">

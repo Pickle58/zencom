@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { BRAND_WIDGET_COLOR } from "@/lib/brand";
 
 const SESSION_KEY = "zencom_visitor_session";
 const LEAD_KEY = "zencom_lead_captured";
@@ -96,7 +97,7 @@ export function WidgetChat({ embedKey }: { embedKey: string }) {
   }, [embedKey, getOrCreateVisitor, getOrCreateConversation]);
 
   const title = settings?.title ?? "Chat";
-  const primaryColor = settings?.primaryColor ?? "#2563eb";
+  const primaryColor = settings?.primaryColor ?? BRAND_WIDGET_COLOR;
   const borderRadius = settings?.borderRadius ?? 0;
   const proactiveMessage = settings?.proactiveMessage?.trim();
   const aiEnabled = settings?.aiEnabled !== false;

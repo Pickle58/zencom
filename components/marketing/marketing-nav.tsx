@@ -5,12 +5,13 @@ import { Show, SignOutButton, OrganizationSwitcher, UserButton } from "@clerk/ne
 import { buttonVariants } from "@/components/ui/button";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ModeToggle } from "@/components/theme/mode-toggle";
 
 export function MarketingNav() {
   return (
     <header className="border-b">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-        <Link href="/" className="text-lg font-semibold">
+        <Link href="/" className="text-lg font-semibold text-primary">
           Zencom
         </Link>
         <nav className="flex items-center gap-4 text-sm">
@@ -20,6 +21,7 @@ export function MarketingNav() {
           <Link href="/docs/install" className="text-muted-foreground hover:text-foreground">
             Install
           </Link>
+          <ModeToggle />
           <Show when="signed-out">
             <Link href="/sign-in" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
               Sign in

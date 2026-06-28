@@ -10,7 +10,7 @@
 
   var baseUrl = script.src.replace(/\/embed\.js(\?.*)?$/, "");
   var title = script.getAttribute("data-title") || "Chat";
-  var color = script.getAttribute("data-color") || "#2563eb";
+  var color = script.getAttribute("data-color") || "#5B63EB";
   var position = script.getAttribute("data-position") || "bottom-right";
   var borderRadius = script.getAttribute("data-border-radius");
   var proactiveEnabled =
