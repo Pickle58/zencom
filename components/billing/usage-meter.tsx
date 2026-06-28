@@ -34,7 +34,10 @@ export function UsageMeter({ label, used, limit, className }: UsageMeterProps) {
       ) : (
         <div className="bg-muted h-2 overflow-hidden rounded-full">
           <div
-            className="bg-primary h-full rounded-full transition-all"
+            className={cn(
+              "h-full rounded-full transition-all",
+              percent >= 90 ? "bg-accent" : "bg-primary",
+            )}
             style={{ width: `${percent}%` }}
           />
         </div>

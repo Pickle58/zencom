@@ -2,10 +2,12 @@
 
 import { OrganizationSwitcher, SignOutButton, UserButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
+import { ModeToggle } from "@/components/theme/mode-toggle";
 
 export function DashboardUserMenu() {
   return (
     <div className="ml-auto flex items-center gap-2">
+      <ModeToggle />
       <OrganizationSwitcher
         hidePersonal
         afterCreateOrganizationUrl="/dashboard"

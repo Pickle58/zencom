@@ -6,6 +6,7 @@ import { Authenticated, AuthLoading } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { EmbedKeyPanel } from "@/components/dashboard/embed-key-panel";
 import { Skeleton } from "@/components/ui/skeleton";
+import { BRAND_WIDGET_COLOR } from "@/lib/brand";
 
 /** Reference snippet — proactive attrs are added automatically when enabled in Customize. */
 function buildEmbedSnippetOptional(origin: string) {
@@ -18,7 +19,7 @@ function buildEmbedSnippetOptional(origin: string) {
   src="${origin}/embed.js"
   data-key="YOUR_EMBED_KEY"
   data-title="Chat with us"
-  data-color="#2563eb"
+  data-color="${BRAND_WIDGET_COLOR}"
   data-position="bottom-right"
   data-border-radius="12"
   async

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { headers } from "next/headers";
+import { BRAND_WIDGET_COLOR } from "@/lib/brand";
 
 export const metadata = {
   title: "Install widget — Zencom",
@@ -12,7 +13,7 @@ function buildEmbedSnippet(origin: string) {
   src="${origin}/embed.js"
   data-key="YOUR_EMBED_KEY"
   data-title="Chat with us"
-  data-color="#2563eb"
+  data-color="${BRAND_WIDGET_COLOR}"
   data-position="bottom-right"
   data-border-radius="12"
   async
