@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useMutation, useQuery } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { Badge } from "@/components/ui/badge";
@@ -13,10 +14,9 @@ import { cn } from "@/lib/utils";
 
 type Filter = "all" | "unread" | "unassigned" | "assigned_to_me" | "closed";
 
-type EnrichedConversation = Doc<"conversations"> & {
-  visitorName: string | null;
-  lastMessageBody: string | null;
-};
+type EnrichedConversation = FunctionReturnType<
+  typeof api.conversations.list
+>[number];
 
 const filters: { id: Filter; label: string }[] = [
   { id: "all", label: "Open" },
