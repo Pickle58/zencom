@@ -1,4 +1,5 @@
 import { WidgetChat } from "@/components/widget/widget-chat";
+import { WidgetErrorBoundary } from "@/components/widget/widget-error-boundary";
 
 export default async function WidgetPage({
   params,
@@ -9,7 +10,9 @@ export default async function WidgetPage({
 
   return (
     <div className="flex h-dvh min-h-0 w-full flex-col">
-      <WidgetChat embedKey={decodeURIComponent(embedKey)} />
+      <WidgetErrorBoundary>
+        <WidgetChat embedKey={decodeURIComponent(embedKey)} />
+      </WidgetErrorBoundary>
     </div>
   );
 }
